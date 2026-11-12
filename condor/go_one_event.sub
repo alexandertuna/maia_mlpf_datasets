@@ -1,0 +1,21 @@
+###
+### mkdir -p logs/
+###
+# container
++SingularityImage = "/cvmfs/unpacked.cern.ch/ghcr.io/muoncollidersoft/mucoll-sim-ubuntu24:v2.9.8-amd64"
+
+executable = ../scripts/go.sh
+arguments  = $(SEED)
+getenv     = MAIA_MLPF_*
+output     = logs/go_$(SEED).$(ClusterId).$(ProcId).out
+error      = logs/go_$(SEED).$(ClusterId).$(ProcId).err
+log        = logs/condor.$(ClusterId).$(ProcId).log
+
+# resources
+request_cpus   = 2
+request_memory = 8GB
+request_disk   = 4GB
++DESIRED_Sites = "T2_US_UCSD"
+
+# launch
+queue SEED from seq 100000 100099 |

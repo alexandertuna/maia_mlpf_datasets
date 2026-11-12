@@ -218,3 +218,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Event data and production outputs (live outside the repo)
+*.slcio
+*.root
+*.hepmc
+*.parquet
+logs/
