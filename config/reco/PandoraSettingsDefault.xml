@@ -18,6 +18,13 @@
         <MinMuonTrackSegmentHitsCut>5</MinMuonTrackSegmentHitsCut>
         <MuonRmsCut>15.625</MuonRmsCut>
     </LCMuonId>
+    <!-- The coil in front of the barrel ECAL leaves electron showers older and the track's cluster with only part of the
+         energy, so the profile and E/p cuts are loosened. The tighter auto-id cut keeps charged hadrons out. -->
+    <LCElectronId>
+        <MaxProfileDiscrepancy>1.2</MaxProfileDiscrepancy>             <!-- default 0.6 -->
+        <ProfileDiscrepancyForAutoId>0.3</ProfileDiscrepancyForAutoId> <!-- default 0.5 -->
+        <MaxResidualEOverP>0.5</MaxResidualEOverP>                     <!-- default 0.2 -->
+    </LCElectronId>
 
     <!-- ALGORITHM SETTINGS -->
 
