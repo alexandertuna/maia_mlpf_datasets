@@ -44,9 +44,11 @@ def merge_parquet_files(directory, output_file):
         for fname, rec in zip(parquet_files, records):
             if rec.fields != fields:
                 raise ValueError(f"Field mismatch in {fname}: {rec.fields} != {fields}")
-        merged = ak.Record({field: ak.concatenate([rec[field] for rec in records]) for field in fields})
-        for field in fields:
-            print(f"  {field}: {len(merged[field])} entries")
+        merged = ak.zip(
+            {field: ak.concatenate([rec[field] for rec in records]) for field in fields},
+            depth_limit=1,   # zip only at the event level, don't broadcast into the jagged hits
+        )
+        print(f"  {len(merged)} events")
     else:
         # Files are plain arrays with many rows: concatenate along rows
         merged = ak.concatenate(arrays)
