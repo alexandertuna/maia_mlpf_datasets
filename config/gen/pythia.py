@@ -21,10 +21,13 @@ ApplicationMgr().OutputLevel = INFO
 ApplicationMgr().ExtSvc += ["RndmGenSvc"]
 
 #### Data service
-from Configurables import k4DataSvc
+from Configurables import EventDataSvc
 
-podioevent = k4DataSvc("EventDataSvc")
+podioevent = EventDataSvc("EventDataSvc")
 ApplicationMgr().ExtSvc += [podioevent]
+
+from Configurables import MetadataSvc
+ApplicationMgr().ExtSvc += [MetadataSvc("MetadataSvc")]
 
 from Configurables import GaussSmearVertex
 
@@ -41,7 +44,6 @@ pythia8gentool = PythiaInterface()
 # take from $K4GEN if defined, locally if not
 pythia8gentool.pythiacard = "p8_ee_Z_Ztautau_ecm125.cmd"
 pythia8gentool.doEvtGenDecays = False
-pythia8gentool.printPythiaStatistics = True
 
 from Configurables import GenAlg
 
@@ -63,8 +65,6 @@ from Configurables import GenParticleFilter
 
 genfilter = GenParticleFilter("StableParticles")
 genfilter.accept = [1]
-genfilter.GenParticles.Path = "GenParticles"
-genfilter.GenParticlesFiltered.Path = "GenParticlesStable"
 ApplicationMgr().TopAlg += [genfilter]
 
 from Configurables import EDMToHepMCConverter

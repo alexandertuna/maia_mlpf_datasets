@@ -2,54 +2,68 @@
 set -eo pipefail
 
 #
-# Build the dependencies in CODE which need compiling (MyBIBUtils, LCContent).
+# Build the dependencies in CODE which need compiling, and install them into CODE/install.
+# HepPDT and EvtGen are only needed to build k4Gen, which the v3.2 container lacks.
 # Run after fetch_deps.sh, inside the container, e.g.:
 #
-#   apptainer exec /cvmfs/unpacked.cern.ch/ghcr.io/muoncollidersoft/mucoll-sim-ubuntu24:v2.9.8-amd64 ./setup/build_deps.sh
+#   apptainer exec /cvmfs/unpacked.cern.ch/ghcr.io/muoncollidersoft/mucoll-sim-ubuntu24:v3.2-amd64 ./setup/build_deps.sh
 #
 
 CODE=${MAIA_MLPF_CODE:-"/ceph/users/atuna/work/maia/maia_mlpf"}
+INSTALL=${CODE}/install
 JOBS=4
 
 #
 # setup if necessary
 #
-if [ ! -d /opt/spack ]; then
+if [ ! -f /opt/setup_mucoll.sh ]; then
     echo "Error: run this inside the container"
     exit 1
 fi
 if ! command -v ddsim >/dev/null 2>&1; then
-    source /opt/spack/opt/spack/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/*/mucol*/setup.sh
+    source /opt/setup_mucoll.sh
 fi
 
 cd ${CODE}
 
 #
-# MyBIBUtils
+# HepPDT
 #
-echo "Building MyBIBUtils ..."
-mkdir -p MyBIBUtils/build
-cd MyBIBUtils/build
-cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo
+echo "Building HepPDT ..."
+cd HepPDT-2.06.01
+./configure --prefix=${INSTALL}
 make -j${JOBS}
+make install
 cd ${CODE}
 
 #
-# LCContent
-# NB: run cmake from inside build/, because Pandora's cmake macros
-#     write LCContentLibDeps.cmake into the current directory
+# EvtGen
 #
-echo "Building LCContent ..."
-PANDORA_CMAKE_MODULES=$(ls -d /opt/spack/opt/spack/*/*/*/*/*/pandorapfa-*/cmakemodules)
-mkdir -p LCContent/build
-cd LCContent/build
+echo "Building EvtGen ..."
+mkdir -p EvtGen/build
+cd EvtGen/build
 cmake .. \
-    -DCMAKE_MODULE_PATH=${PANDORA_CMAKE_MODULES} \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-    -DCMAKE_CXX_STANDARD=20 \
-    -DCMAKE_CXX_FLAGS=-Wno-error \
-    -DCMAKE_INSTALL_PREFIX=${CODE}/LCContent/install
+    -DCMAKE_INSTALL_PREFIX=${INSTALL} \
+    -DEVTGEN_HEPMC3=ON \
+    -DEVTGEN_PYTHIA=ON \
+    -DEVTGEN_PHOTOS=OFF \
+    -DEVTGEN_TAUOLA=OFF
 make -j${JOBS} install
 cd ${CODE}
 
-echo "Done. Built MyBIBUtils and LCContent in ${CODE}"
+#
+# k4Gen
+#
+echo "Building k4Gen ..."
+mkdir -p k4Gen/build
+cd k4Gen/build
+cmake .. \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DCMAKE_INSTALL_PREFIX=${INSTALL} \
+    -DCMAKE_PREFIX_PATH=${INSTALL} \
+    -DBUILD_TESTING=OFF
+make -j${JOBS} install
+cd ${CODE}
+
+echo "Done. Built HepPDT, EvtGen, and k4Gen into ${INSTALL}"

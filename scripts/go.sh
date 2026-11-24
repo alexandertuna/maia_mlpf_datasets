@@ -12,13 +12,11 @@ set -eo pipefail
 
 #
 # 2a. and activate container like this when running locally
-# apptainer run /cvmfs/unpacked.cern.ch/ghcr.io/muoncollidersoft/mucoll-sim-ubuntu24:v2.9.8-amd64
-# setup_mucoll
-# CODE=/ceph/users/atuna/work/maia/maia_mlpf
-# export MARLIN_DLL=$(readlink -e ${CODE}/MyBIBUtils/build/lib/libMyBIBUtils.so):${MARLIN_DLL}
+# apptainer run /cvmfs/unpacked.cern.ch/ghcr.io/muoncollidersoft/mucoll-sim-ubuntu24:v3.2-amd64
+# source /opt/setup_mucoll.sh
 #
 # 2b. alternatively, you can run locally like:
-# apptainer exec /cvmfs/unpacked.cern.ch/ghcr.io/muoncollidersoft/mucoll-sim-ubuntu24:v2.9.8-amd64 ./go.sh 100000
+# apptainer exec /cvmfs/unpacked.cern.ch/ghcr.io/muoncollidersoft/mucoll-sim-ubuntu24:v3.2-amd64 ./go.sh 100000
 #
 
 #
@@ -46,7 +44,6 @@ DO_CLEANUP=${DO_CLEANUP:-true}
 #
 CODE=${MAIA_MLPF_CODE:-"/ceph/users/atuna/work/maia/maia_mlpf"}
 VENV=${MAIA_MLPF_VENV:-"${REPO}/venv"}
-COMPACT=${CODE}/detector-simulation/geometries/MAIA_v0/MAIA_v0.xml
 PFLOW=${CODE}/particleflow
 
 #
@@ -54,11 +51,15 @@ PFLOW=${CODE}/particleflow
 #
 if ! command -v ddsim >/dev/null 2>&1; then
     echo "Setting env ${SEED} at $(date) ..."
-    source /opt/spack/opt/spack/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/*/mucol*/setup.sh
-    export MARLIN_DLL=$(readlink -e ${CODE}/MyBIBUtils/build/lib/libMyBIBUtils.so):${MARLIN_DLL}
-    export LD_LIBRARY_PATH=${CODE}/LCContent/install/lib:${LD_LIBRARY_PATH}
-    # ldd $(echo "$MARLIN_DLL" | tr : "\n" | grep ddmarlinpandora) | grep LCContent
+    source /opt/setup_mucoll.sh
 fi
+export LD_LIBRARY_PATH=${CODE}/install/lib:${LD_LIBRARY_PATH}
+export PYTHONPATH=${CODE}/install/python:${PYTHONPATH}
+
+#
+# geometry from the container's k4geo (k4geo_DIR is set by the setup above)
+#
+COMPACT=${k4geo_DIR}/MuColl/MAIA/compact/MAIA_v0/MAIA_v0.xml
 
 #
 # file names
@@ -67,14 +68,10 @@ TYPEEVENT="ttbar"
 GEN_TEMPLATE=p8_mumu_tt_ecm10000.cmd
 GEN_CMD=p8_mumu_tt_ecm10000_${SEED}.cmd
 GEN_HEPMC=${TYPEEVENT}_${SEED}.hepmc
-SIM_STEER=${REPO}/config/sim/sim_steer_GEN_CONDOR.py
-SIM_SLCIO=${TYPEEVENT}_sim_${SEED}.slcio
-REC_STEER=${REPO}/config/reco/steer_reco_${TYPEEVENT}.py
-REC_SLCIO=${TYPEEVENT}_reco_${SEED}.slcio
-REC_ROOT=${REC_SLCIO}.edm4hep.root
-REC_PATCH=${REPO}/config/reco/patch.txt
-REC_PANDORA_TEMPLATE=PandoraSettingsDefault.xml
-REC_PANDORA=PandoraSettings_${SEED}.xml
+SIM_STEER=${CODE}/mucoll-benchmarks/simulation/steer_baseline.py
+SIM_EDM4HEP=${TYPEEVENT}_sim_${SEED}.edm4hep.root
+REC_STEER=${CODE}/MAIAConfig/MAIAConfig/digi_reco_steer.py
+REC_EDM4HEP=${TYPEEVENT}_reco_${SEED}.edm4hep.root
 GEN_LOG=log_gen_${SEED}.txt
 SIM_LOG=log_sim_${SEED}.txt
 REC_LOG=log_rec_${SEED}.txt
@@ -102,7 +99,7 @@ if $DO_SIM; then
     echo "Running sim ${SEED} at $(date) ..."
     ddsim \
         --inputFile ${GEN_HEPMC} \
-        --outputFile ${SIM_SLCIO} \
+        --outputFile ${SIM_EDM4HEP} \
         --steeringFile ${SIM_STEER} \
         --compactFile ${COMPACT} \
         --numberOfEvents ${EVENTS_PER_JOB} \
@@ -115,16 +112,12 @@ fi
 #
 if $DO_REC; then
     echo "Running rec ${SEED} at $(date) ..."
-    cp ${REPO}/config/reco/${REC_PANDORA_TEMPLATE} ${REC_PANDORA}
-    sed -i "s|@REPO@|${REPO}|g" ${REC_PANDORA}
     k4run ${REC_STEER} \
-         --TypeEvent ${TYPEEVENT} \
-         --InFileName ${SEED} \
-         --code ${CODE} \
-         --pandoraSettings ${REC_PANDORA} \
-         --skipTrackerConing \
-         &> ${REC_LOG}
-    lcio2edm4hep ${REC_SLCIO} ${REC_ROOT} ${REC_PATCH}
+        --doCaloTruthLinks \
+        --inputFiles ${SIM_EDM4HEP} \
+        --outputFile ${REC_EDM4HEP} \
+        -n ${EVENTS_PER_JOB} \
+        &> ${REC_LOG}
 fi
 
 #
@@ -135,7 +128,7 @@ if $DO_POST; then
     export PYTHONPATH=${PFLOW}
     ${VENV}/bin/python \
         ${PFLOW}/mlpf/data/key4hep/postprocessing.py \
-        --input ${REC_ROOT} \
+        --input ${REC_EDM4HEP} \
         --outpath $(pwd) \
         --detector maia \
         &> ${POST_LOG}
@@ -146,5 +139,5 @@ fi
 #
 if $DO_CLEANUP; then
     echo "Running cleanup ${SEED} at $(date) ..."
-    rm -f ${GEN_CMD} ${GEN_HEPMC} ${SIM_SLCIO} ${REC_PANDORA} ${REC_SLCIO} ${REC_ROOT}
+    rm -f ${GEN_CMD} ${GEN_HEPMC} ${SIM_EDM4HEP} ${REC_EDM4HEP}
 fi
