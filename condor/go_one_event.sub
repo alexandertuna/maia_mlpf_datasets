@@ -2,7 +2,7 @@
 ### mkdir -p logs/
 ###
 # container
-+SingularityImage = "/cvmfs/unpacked.cern.ch/ghcr.io/muoncollidersoft/mucoll-sim-ubuntu24:v2.9.8-amd64"
++SingularityImage = "/cvmfs/unpacked.cern.ch/ghcr.io/muoncollidersoft/mucoll-sim-ubuntu24:v3.2-amd64"
 
 executable = ../scripts/go.sh
 arguments  = $(SEED)
